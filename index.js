@@ -14,12 +14,13 @@ if (process.env.PACKAGEJSON_DIR) {
 }
 
 const workspace = process.env.GITHUB_WORKSPACE;
+const pkg = getPackageJson();
 
 (async () => {
   const pkg = getPackageJson();
   const event = process.env.GITHUB_EVENT_PATH ? getEventData(process.env.GITHUB_EVENT_PATH) : {};
 
-  if (!event.commits) {
+  if (!event.commits && !process.env['INPUT_VERSION-TYPE']) {
     console.log("Couldn't find any commits in this event, incrementing patch version...");
   }
   const extraPackagesDirectory = process.env['INPUT_EXTRA-PACKAGE-DIR'];
@@ -27,7 +28,15 @@ const workspace = process.env.GITHUB_WORKSPACE;
   if (extraPackagesDirectory) {
     extraPackages = extraPackagesDirectory.split(":");
   }
+  const allowedTypes = ['major', 'minor', 'patch', 'rc']
+  if (process.env['INPUT_VERSION-TYPE'] && !allowedTypes.includes(process.env['INPUT_VERSION-TYPE'])) {
+    exitFailure('Invalid version type');
+    return;
+  }
+
+  const versionType = process.env['INPUT_VERSION-TYPE'];
   const tagPrefix = process.env['INPUT_TAG-PREFIX'] || '';
+  console.log('tagPrefix:', tagPrefix);
   const messages = event.commits ? event.commits.map((commit) => commit.message + '\n' + commit.body) : [];
 
   const commitMessage = process.env['INPUT_COMMIT-MESSAGE'] || 'ci: version bump to {{version}}';
@@ -70,8 +79,12 @@ const workspace = process.env.GITHUB_WORKSPACE;
   // get the pre-release prefix specified in action
   let preid = process.env.INPUT_PREID;
 
+  // case if version-type found
+  if (versionType) {
+    version = versionType;
+  }
   // case: if wording for MAJOR found
-  if (
+  else if (
     messages.some(
       (message) => /^([a-zA-Z]+)(\(.+\))?(\!)\:/.test(message) || majorWords.some((word) => message.includes(word)),
     )
@@ -100,7 +113,9 @@ const workspace = process.env.GITHUB_WORKSPACE;
       }),
     )
   ) {
-    preid = foundWord.split('-')[1];
+    if (foundWord !== ''){
+      preid = foundWord.split('-')[1];
+    }
     version = 'prerelease';
   }
 
@@ -150,23 +165,32 @@ const workspace = process.env.GITHUB_WORKSPACE;
       `"${process.env.GITHUB_EMAIL || 'gh-action-bump-version@users.noreply.github.com'}"`,
     ]);
 
-    let currentBranch = /refs\/[a-zA-Z]+\/(.*)/.exec(process.env.GITHUB_REF)[1];
+    let currentBranch;
     let isPullRequest = false;
     if (process.env.GITHUB_HEAD_REF) {
       // Comes from a pull request
       currentBranch = process.env.GITHUB_HEAD_REF;
       isPullRequest = true;
+    } else {
+      currentBranch = /refs\/[a-zA-Z]+\/(.*)/.exec(process.env.GITHUB_REF)[1];
     }
     if (process.env['INPUT_TARGET-BRANCH']) {
       // We want to override the branch that we are pulling / pushing to
       currentBranch = process.env['INPUT_TARGET-BRANCH'];
     }
     console.log('currentBranch:', currentBranch);
+
+    if (!currentBranch) {
+      exitFailure('No branch found');
+      return;
+    }
+
     // do it in the current checked out github branch (DETACHED HEAD)
     // important for further usage of the package.json version
     await runInWorkspace('npm', ['version', '--allow-same-version=true', '--git-tag-version=false', current]);
-    console.log('current:', current, '/', 'version:', version);
+    console.log('current 1:', current, '/', 'version:', version);
     let newVersion = execSync(`npm version --git-tag-version=false ${version}`).toString().trim().replace(/^v/, '');
+    console.log('newVersion 1:', newVersion);
     newVersion = `${tagPrefix}${newVersion}`;
 
     if (extraVersionFile !== '') {
@@ -195,9 +219,15 @@ const workspace = process.env.GITHUB_WORKSPACE;
     }
     await runInWorkspace('git', ['checkout', currentBranch]);
     await runInWorkspace('npm', ['version', '--allow-same-version=true', '--git-tag-version=false', current]);
-    console.log('current:', current, '/', 'version:', version);
+    console.log('current 2:', current, '/', 'version:', version);
+    console.log('execute npm version now with the new version:', version);
     newVersion = execSync(`npm version --git-tag-version=false ${version}`).toString().trim().replace(/^v/, '');
+    // fix #166 - npm workspaces
+    // https://github.com/phips28/gh-action-bump-version/issues/166#issuecomment-1142640018
+    newVersion = newVersion.split(/\n/)[1] || newVersion;
+    console.log('newVersion 2:', newVersion);
     newVersion = `${tagPrefix}${newVersion}`;
+    console.log(`newVersion after merging tagPrefix+newVersion: ${newVersion}`);
     console.log(`::set-output name=newTag::${newVersion}`);
 
     if (extraVersionFile !== '') {

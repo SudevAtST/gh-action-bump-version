@@ -1,6 +1,6 @@
 {
   "name": "gh-action-bump-version",
-  "version": "9.2.0",
+  "version": "9.0.33",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SudevAtST/gh-action-bump-version.git"
@@ -26,7 +26,7 @@
     "execa": "^5.1.1",
     "jest": "^27.5.1",
     "js-yaml": "^4.1.0",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^2.6.7",
     "prettier": "^2.3.0",
     "standard": "^16.0.4",
     "tiny-glob": "^0.2.9"
