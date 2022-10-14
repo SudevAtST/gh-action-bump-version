@@ -33,12 +33,6 @@ const workspace = process.env.GITHUB_WORKSPACE;
     return;
   }
 
-  const allowedTypes = ['major', 'minor', 'patch', 'rc']
-  if (process.env['INPUT_VERSION-TYPE'] && !allowedTypes.includes(process.env['INPUT_VERSION-TYPE'])) {
-    exitFailure('Invalid version type');
-    return;
-  }
-
   const versionType = process.env['INPUT_VERSION-TYPE'];
   const tagPrefix = process.env['INPUT_TAG-PREFIX'] || '';
   console.log('tagPrefix:', tagPrefix);
