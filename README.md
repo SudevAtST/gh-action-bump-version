@@ -190,6 +190,19 @@ Example:
     extra-version-file: 'version.info'
 ```
 
+#### **extra-package-dir:**
+Writes version to other `package.json` files in specified directories, list seperated by `:`.
+
+Example:
+```yaml
+- name:  'Automated Version Bump'
+  uses:  'Troperty/gh-action-bump-version@master'
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  with:
+    extra-package-dir: './packages/server/:./packages/client/'
+```
+
 #### [DEPRECATED] **push:**
 **DEPRECATED** Set false you want to avoid pushing the new version tag/package.json. Example:
 ```yaml
